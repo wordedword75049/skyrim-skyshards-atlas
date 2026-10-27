@@ -1,0 +1,22 @@
+[project]
+name = "skyshard-atlas"
+version = "0.1.0"
+description = "Offline, read-only Deadmano Skyshards tracker for Skyrim Special Edition"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.14"
+dependencies = ["fastapi>=0.115,<1", "uvicorn>=0.34,<1", "lz4>=4.4.5,<5", "pillow>=13,<14", "sse-bsa>=1.1,<2"]
+
+[project.scripts]
+skyshard-tracker = "skyshard_tracker.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/skyshard_tracker"]
+
+[dependency-groups]
+research = ["lz4>=4.4.5"]
+test = ["httpx>=0.27,<1"]

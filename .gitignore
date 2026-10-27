@@ -1,0 +1,38 @@
+# User configuration and locally generated game-derived data
+.env
+.skyshard-tracker.toml
+/assets/local/
+/research/
+
+# Python and editor artifacts
+.venv/
+.uv-cache/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.idea/
+.vscode/
+dist/
+build/
+*.log
+
+# Browser and test artifacts
+playwright-report/
+test-results/
+*.png
+*.webp
+*.dds
+*.btr
+*.bsa
+*.ba2
+*.esp
+*.esm
+*.esl
+*.pex
+*.nif
+*.ess
+*.skse
+!src/skyshard_tracker/static/vendor/leaflet/images/*.png

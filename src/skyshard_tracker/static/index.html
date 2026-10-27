@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#191c1c">
+  <title>Skyshard Atlas · Skyrim Skyshard Tracker</title>
+  <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script defer src="/static/vendor/leaflet/leaflet.js"></script>
+  <script type="module" src="/static/app.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Tracker controls">
+      <header class="brand"><div class="brand-emblem" aria-hidden="true">✧</div><div><span class="eyebrow">SKYRIM SPECIAL EDITION</span><h1>Skyshard <em>Atlas</em></h1></div></header>
+      <section class="panel progress-panel" aria-labelledby="progress-heading">
+        <div class="section-topline"><h2 id="progress-heading">Your collection</h2><span id="progress-percent">—</span></div>
+        <div class="progress-display"><div class="progress-ring" id="progress-ring" style="--progress:0%"><div class="progress-ring-inner"><strong id="progress-collected">—</strong><span>OF 108 FOUND</span></div></div><div class="progress-legend"><div><i class="legend-dot uncollected"></i><span>Uncollected</span><strong id="count-uncollected">—</strong></div><div><i class="legend-dot collected"></i><span>Collected</span><strong id="count-collected">—</strong></div><div><i class="legend-dot unknown"></i><span>Unknown</span><strong id="count-unknown">—</strong></div></div></div>
+      </section>
+      <section class="panel filter-panel" aria-labelledby="filter-heading">
+        <div class="section-topline"><h2 id="filter-heading">Show on map</h2><button id="reset-filters" class="text-button" type="button">Reset</button></div>
+        <label class="filter-row"><span class="filter-label"><i class="legend-dot uncollected"></i>Uncollected</span><input id="filter-uncollected" type="checkbox" checked><span class="switch" aria-hidden="true"></span></label>
+        <label class="filter-row"><span class="filter-label"><i class="legend-dot collected"></i>Collected</span><input id="filter-collected" type="checkbox"><span class="switch" aria-hidden="true"></span></label>
+        <label class="filter-row"><span class="filter-label"><i class="legend-dot unknown"></i>Unknown</span><input id="filter-unknown" type="checkbox" checked><span class="switch" aria-hidden="true"></span></label>
+        <div class="field-group"><label for="hold-filter">HOLD</label><select id="hold-filter"><option value="all">All nine holds</option></select></div><p class="filter-footnote" id="visible-count">Waiting for map data</p>
+      </section>
+      <section class="panel save-panel" aria-labelledby="save-heading">
+        <div class="section-topline"><h2 id="save-heading">Current save</h2><span class="live-indicator" id="live-indicator">WAITING</span></div>
+        <div class="save-character" id="save-character">Awaiting a verified save</div>
+        <div class="save-detail-grid"><span>Save number</span><strong id="save-number">—</strong><span>Modified</span><strong id="save-modified">—</strong><span>Parsed</span><strong id="save-parsed">—</strong></div>
+        <div class="save-file" id="save-file">No save loaded</div><div class="player-location-state" id="player-location-state">Player position unavailable: no save has been parsed</div><div class="warning-box hidden" id="save-warning" role="alert"></div>
+        <button id="refresh-button" class="refresh-button" type="button"><span aria-hidden="true">↻</span> Refresh save</button><p id="refresh-status" class="refresh-status" role="status">Automatically checks for saves every 15 seconds.</p>
+      </section>
+      <footer class="sidebar-footer" id="map-source-note">SKYRIM SE TERRAIN LOD <span>·</span> LOCAL &amp; OFFLINE<br>EXACT WORLD GRID · 32 UNITS PER DETAIL PIXEL</footer>
+    </aside>
+    <main class="map-area">
+      <div class="map-toolbar"><div><span class="toolbar-kicker">THE PROVINCE OF</span><strong>SKYRIM</strong><span class="toolbar-separator">/</span><span class="toolbar-context">Tamriel · 108 Skyshards</span></div><button id="reset-view" class="view-button" type="button">⌖ <span>Reset view</span></button></div>
+      <button id="center-player" class="view-button center-player" type="button" disabled>◆ Center on player</button>
+      <div id="map" aria-label="Interactive map of Skyrim"></div>
+      <div class="map-layer-controls" aria-label="Geography layers">
+        <span>MAP LAYERS</span>
+        <label><input id="layer-water" type="checkbox" checked> Water</label>
+        <label><input id="layer-labels" type="checkbox" checked> Place names</label>
+        <label><input id="layer-landmarks" type="checkbox" checked> Landmarks</label>
+      </div>
+      <div class="geography-warning hidden" id="geography-warning" role="alert"></div>
+      <div id="map-status" class="map-status" role="status"><div class="loading-sigil" aria-hidden="true">✧</div><strong>Loading the local terrain map</strong><span>Reading generated terrain and water tiles…</span></div>
+      <div class="map-corner-label" id="map-corner-label">ENHANCED TERRAIN · LOCAL &amp; OFFLINE</div><div id="toast" class="toast hidden" role="status"></div>
+    </main>
+  </div>
+</body>
+</html>
