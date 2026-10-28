@@ -43,19 +43,19 @@ test('counts and marker classes keep unknown separate', () => {
   assert.equal(readableName('DMN_SkyshardFalkreath04', 'Falkreath'), 'Falkreath · Skyshard 04');
 });
 
-test('known 439 to 440 single transition highlights Falkreath04', () => {
-  const before = snapshot([shard('DMN_SkyshardFalkreath04', 'uncollected')], save(439, '2026-10-20T14:37:11Z'));
-  const after = snapshot([shard('DMN_SkyshardFalkreath04', 'collected')], save(440, '2026-10-20T14:39:05Z'));
+test('a single collection in consecutive synthetic saves highlights its marker', () => {
+  const before = snapshot([shard('DMN_SkyshardFalkreath04', 'uncollected')], save(1, '2026-01-01T12:00:00Z'));
+  const after = snapshot([shard('DMN_SkyshardFalkreath04', 'collected')], save(2, '2026-01-01T12:01:00Z'));
   assert.equal(collectionTransition(before, after), 'DMN_SkyshardFalkreath04');
 });
 
 test('older saves, character switches, uncertainty, and stale data do not animate', () => {
   const id = 'DMN_SkyshardFalkreath04';
-  const before = snapshot([shard(id, 'uncollected')], save(439, '2026-10-20T14:37:11Z'));
-  const later = snapshot([shard(id, 'collected')], save(440, '2026-10-20T14:39:05Z'));
+  const before = snapshot([shard(id, 'uncollected')], save(1, '2026-01-01T12:00:00Z'));
+  const later = snapshot([shard(id, 'collected')], save(2, '2026-01-01T12:01:00Z'));
   assert.equal(collectionTransition(later, before), null);
-  assert.equal(collectionTransition(before, {...later, save: save(440, '2026-10-20T14:39:05Z', 'Other')}), null);
-  assert.equal(collectionTransition(before, {...later, save: save(440, '2026-10-20T14:39:05Z', 'TestHero', 'renamed.ess')}), null);
+  assert.equal(collectionTransition(before, {...later, save: save(2, '2026-01-01T12:01:00Z', 'Other')}), null);
+  assert.equal(collectionTransition(before, {...later, save: save(2, '2026-01-01T12:01:00Z', 'TestHero', 'renamed.ess')}), null);
   assert.equal(collectionTransition(before, {...later, is_newest: false}), null);
   assert.equal(collectionTransition({...before, unknown_count: 1}, later), null);
   assert.equal(collectionTransition(before, {...later, newer_save_error: 'incomplete'}), null);
@@ -63,8 +63,8 @@ test('older saves, character switches, uncertainty, and stale data do not animat
 
 test('player position is visible only for a current verified Tamriel exterior save', () => {
   const location = {status: 'available', worldspace: 'Tamriel', is_exterior: true,
-    x: -72895.84375, y: -68086.8359375};
-  const current = snapshot([], save(439, '2026-10-20T14:37:11Z'), {player_location: location});
+    x: 128, y: -256};
+  const current = snapshot([], save(1, '2026-01-01T12:00:00Z'), {player_location: location});
   assert.equal(visiblePlayerLocation(current), location);
   assert.equal(visiblePlayerLocation({...current, is_newest: false}), null);
   assert.equal(visiblePlayerLocation({...current, newer_save_error: 'bad save'}), null);
@@ -73,11 +73,11 @@ test('player position is visible only for a current verified Tamriel exterior sa
   assert.equal(visiblePlayerLocation({...current, player_location: {...location, is_exterior: false}}), null);
   assert.equal(visiblePlayerLocation({...current, player_location: {...location, x: NaN}}), null);
   const pixels = projectWorld([1/64, 0, 4096, 0, -1/64, 4096], location.x, location.y);
-  assert.deepEqual(pixels, [2957.00244140625, 5159.8568115234375]);
+  assert.deepEqual(pixels, [4098, 4100]);
 });
 
 test('missing optional co-save is diagnostic, not stale progress', () => {
-  const current = snapshot([], save(1, '2026-10-20T14:37:11Z'),
+  const current = snapshot([], save(1, '2026-01-01T12:00:00Z'),
     {warnings: ['Matching SKSE co-save: missing']});
   assert.deepEqual(saveIndicator(current), {state: 'live', text: 'LATEST SAVE'});
   assert.equal(saveIndicator({...current, newer_save_error: 'bad save'}).state, 'stale');

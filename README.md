@@ -1,84 +1,103 @@
 # Skyshard Atlas
 
-An offline, read-only tracker for Deadmano's 108 Skyshards in Skyrim Special Edition. It reads the newest `.ess` save, validates the absorbed-shard FormList and counters, and shows collected, uncollected, or unknown shards on a world-aligned terrain map. It also shows a saved player position when the save confirms an outdoor Tamriel location.
+Skyshard Atlas is a local, read-only map and save tracker for the 108 collectibles in Deadmano's Skyshards mod for Skyrim Special Edition. It shows collected, uncollected, and unknown shards on a terrain map built from your installed game assets. It can also show your last saved outdoor position in Skyrim.
+
+The application runs on your PC at <http://127.0.0.1:8000/>. It does not connect to Skyrim's live memory or require an internet connection during use.
 
 ## Requirements
 
-- Windows, Python 3.14, and [uv](https://docs.astral.sh/uv/).
-- Skyrim Special Edition with `Skyrim.esm`, `Skyrim - Textures7.bsa`, and `Skyrim - Meshes1.bsa` in the game's `Data` directory.
-- Deadmano's original regular `Skyshards.esp` or the ESL-flagged, FormID-compacted **Skyshards - Tweaks** variant. The importer checks their shard, quest, script and ledger structures. Vicn's Skyshards Framework is not supported. See [compatibility details](docs/portable-assets.md).
-- A directory of Skyrim Special Edition `.ess` saves. A matching `.skse` co-save is optional for this tracker.
+- Windows, Python 3.14, [uv](https://docs.astral.sh/uv/), and a local Skyrim Special Edition installation.
+- The game's `Data` folder must contain `Skyrim.esm`, `Skyrim - Textures7.bsa`, and `Skyrim - Meshes1.bsa` to build the map.
+- Deadmano's original `Skyshards.esp` or a structurally compatible ESL-flagged, FormID-compacted **Skyshards - Tweaks** variant. Vicn's Skyshards Framework is not supported.
+- A directory containing Skyrim Special Edition `.ess` saves. SKSE co-saves are optional for tracking shards.
 
-Game, mod, and map assets are **not** included. You must obtain and install them under their own terms. The MIT license applies to original Skyshard Atlas code; bundled Leaflet has its own [BSD 2-Clause notice](src/skyshard_tracker/static/vendor/leaflet/LICENSE).
+Skyrim, Skyshards, and their assets are not included in this repository.
 
-## Install and configure
+## Quick Start
 
-```powershell
-git clone https://github.com/wordedword75049/skyrim-skyshards-atlas.git
-cd skyrim-skyshards-atlas
-uv sync
-Copy-Item .env.example .env
-```
+1. Install Skyrim Special Edition and a supported Deadmano Skyshards mod. Enable the mod in your game setup.
+2. Install Python 3.14 and uv, then clone and configure Atlas:
 
-Edit `.env` with **two paths**:
+   ```powershell
+   git clone https://github.com/wordedword75049/skyrim-skyshards-atlas.git
+   cd skyrim-skyshards-atlas
+   uv sync
+   Copy-Item .env.example .env
+   ```
 
-```dotenv
-SKYRIM_GAME_DIR=C:\Games\Skyrim Special Edition
-SKYRIM_SAVES_DIR=C:\Users\Username\Documents\My Games\Skyrim Special Edition\Saves
-```
+3. Edit `.env` so `SKYRIM_GAME_DIR` points to the game folder containing `Data`, and `SKYRIM_SAVES_DIR` points to the folder containing your `.ess` saves:
 
-`SKYRIM_GAME_DIR` is the folder containing `Data`; `SKYRIM_SAVES_DIR` contains `.ess` files. System environment variables with these names override `.env`. MO2 users can set `SKYRIM_SAVES_DIR` to their profile's saves directory. `.env` is ignored by Git. No MO2 discovery or load-order changes occur.
+   ```dotenv
+   SKYRIM_GAME_DIR=C:\Games\Skyrim Special Edition
+   SKYRIM_SAVES_DIR=C:\Users\Username\Documents\My Games\Skyrim Special Edition\Saves
+   ```
 
-## Build and run
+4. Generate the map from your local game archives:
 
-```powershell
-uv run skyshard-tracker build-map
-uv run skyshard-tracker
-```
+   ```powershell
+   uv run skyshard-tracker build-map
+   ```
 
-The first command extracts 1,024 Tamriel LOD4 diffuse/normal/mesh triplets from **official local game archives** into a temporary ignored directory, generates terrain and water imagery, and builds 24 vanilla landmark positions from `Skyrim.esm`. It may take a few minutes and needs several gigabytes of free project-disk space during generation. Subsequent runs skip a valid map with matching archive hashes. To rebuild explicitly:
+   This normally runs only once. Generated images stay in the ignored `assets/local/` cache. Starting the app does not regenerate the map.
 
-```powershell
-uv run skyshard-tracker build-map --force
-```
+5. If Atlas cannot find the effective `Skyshards.esp` in the configured game's `Data` folder, import it from its actual location:
 
-Map generation is never triggered by starting the server or opening the page. Finished assets stay in ignored `assets/local/`. An interrupted build leaves the previous map active.
+   ```powershell
+   uv run skyshard-tracker import-plugin "C:\path\to\Skyshards.esp"
+   ```
 
-If a compatible `Skyshards.esp` is in the configured game's `Data` directory, startup creates the local 108-shard catalog automatically when none is imported. An explicitly imported catalog remains selected. If a mod manager keeps the effective plugin elsewhere, import that file explicitly:
+6. Start Atlas and open <http://127.0.0.1:8000/>:
 
-```powershell
-uv run skyshard-tracker import-plugin "C:\path\to\Skyshards.esp"
-```
+   ```powershell
+   uv run skyshard-tracker
+   ```
 
-The importer discovers FormIDs from the supplied ESP and checks all 108 shard EditorIDs and references against the activator base, helper quest aliases, map-marker list, absorption script properties, FormList and four counters. Users of the three validated location patches may add a repeatable `--patch "C:\path\to\patch.esp"` for each enabled patch. Those patches were validated against the compacted variant and must override one imported shard each. No imported ESP is copied into the repository. A changed plugin in `Data` is revalidated automatically; a changed manually imported plugin or patch requires reimport.
+Press Ctrl+C to stop the server.
 
-Open <http://127.0.0.1:8000/>. The service binds to loopback only. `GET /api/progress`, `POST /api/refresh`, `GET /api/health`, `GET /api/map`, and `GET /api/landmarks` are available locally. Press Ctrl+C to stop.
+## Basic Gameplay Workflow
 
-## Tracking behavior
+1. Start Skyrim with Deadmano Skyshards enabled and create or load a character.
+2. Save the game, then open Atlas to see the 108 shard locations and the collection states supported by that save.
+3. Collect a Skyshard in Skyrim. After the absorption animation and game updates finish, save again.
+4. Atlas detects the new or overwritten save and refreshes the counts and markers automatically. Continue exploring and saving normally.
 
-The backend checks the newest stable `.ess` every 15 seconds, including overwritten quicksaves. The page polls the local API without moving the map or resetting filters. It shows save identity and a warning if a newer save cannot be parsed. Each save's own full or light plugin table maps imported local FormIDs to runtime IDs; no Nolvus load-order index is assumed. An absent shard is marked **uncollected only when** all 108 identities, the absorbed FormList, both activated counters, and both total counters agree. Otherwise unresolved shards remain **unknown**. A full/light mismatch also remains unknown. A missing or unstable `.skse` co-save is diagnostic; the progress ledger is in the `.ess` file.
+Atlas reads saved game data, not live game memory. Collection progress and the player marker reflect the latest **successfully parsed save**; without a new save, they cannot update. An initial save may not yet contain the absorbed-shard ledger. Incomplete or inconsistent evidence appears as **unknown**, never as an assumed uncollected shard. If a newer save fails to parse, Atlas keeps the last valid snapshot and shows a stale-data warning. Atlas never modifies Skyrim, installs mods, or changes saves.
 
-The player marker appears only when the save verifies a current outdoor Tamriel position. Interior and other-worldspace positions are hidden. Map projection is exact for the world grid: `pixel_x=(world_x+262144)/64`, `pixel_y=(262144-world_y)/64` in the 8,192-pixel overview. The map has 512-pixel regional tiles, a separate water layer, and vanilla city and landmark labels.
+## Configuration and Commands
 
-## Tests
+The two required settings are `SKYRIM_GAME_DIR` and `SKYRIM_SAVES_DIR`. They can be set in `.env` or as system environment variables; system values take precedence. Mod-manager users can point `SKYRIM_SAVES_DIR` to a profile-specific saves folder. `.env` is ignored by Git.
 
-```powershell
-uv run --group test python -m unittest discover -s tests -t . -v
-node --test tests/*.test.mjs
-```
+| Command | Purpose |
+| --- | --- |
+| `uv run skyshard-tracker build-map` | Build local terrain, water, and landmark assets; skip a valid existing map. |
+| `uv run skyshard-tracker build-map --force` | Rebuild the map cache. |
+| `uv run skyshard-tracker import-plugin "C:\path\to\Skyshards.esp"` | Select and validate an ESP outside game `Data`. |
+| `uv run skyshard-tracker` | Start the local web application. |
 
-The publishable suite builds synthetic ESS files for both full and light load-order mappings and tests parsing, classification, configuration, cache safety and the local API. Structural integration tests run when both ignored Deadmano ESPs are available. Real archive integration tests run when `SKYRIM_GAME_DIR` points to a game installation. Historical tests using real private saves are retained locally under ignored `research/tmp/private_tests/` and are not distributed. Optional Chrome smoke test: `uv run --group test --with playwright python -m tests.browser_smoke` (requires Chrome and local private fixtures). See [release audit](docs/public-release-audit.md) for what was actually tested.
+With no imported catalog, Atlas discovers a compatible `Data\Skyshards.esp` automatically. A manual import takes precedence while its source file remains present and unchanged, even when a different plugin exists in physical `Data`; this supports mod managers with virtual game folders. If the selected source or a selected location patch is moved, deleted, or changed, startup stops with a reimport instruction instead of using stale data or guessing which plugin is active. Reimport the **effective** ESP to recover. A changed automatically discovered `Data` plugin is structurally revalidated and reimported. Do not import an inactive plugin: the imported full or light layout must match the plugin used by the save.
 
-## Limits and troubleshooting
+The importer checks all 108 shard references, their activator, helper quest aliases, marker list, absorption script links, FormList, and four counters. It resolves regular and light-plugin FormIDs using each save's own plugin tables. Three specifically validated location patches may be supplied with repeatable `--patch "C:\path\to\patch.esp"` arguments during import; arbitrary patches are not accepted.
 
-- **Unsupported plugin:** import an original Deadmano ESP or structurally compatible Tweaks variant. A similar filename or mod version alone does not establish compatibility; the importer reports the missing structural relationship.
-- **Original ESP validation limit:** its structure and script properties match the supported ledger, and synthetic regular-ESP saves parse at multiple full indices. No real original-ESP before/after save pair has been tested yet.
-- **Clean-install limit:** end-to-end setup has not been tested on a separate clean Steam Skyrim installation.
-- **Broader mod compatibility:** other Skyshards implementations, arbitrary ESP variants, and unvalidated location patches are not supported or verified.
-- **Map unavailable:** run `build-map`; confirm the two named vanilla BSAs and `Skyrim.esm` exist in `Data`. Use `--force` if the ignored cache is incomplete.
-- **Unknown progress:** check the warning shown by `/api/progress`; missing or inconsistent saved ledger/counters are not treated as zero collected.
-- **No player marker:** interior cells, other worldspaces, stale saves, and unsupported location fields intentionally hide it.
-- **Modded geography:** the map and landmark overlay use official game assets. Third-party terrain and map-marker overrides are not applied automatically. Validated Skyshard location patches can be imported explicitly.
-- **Offline use:** install Python dependencies once; the running service, Leaflet assets, map imagery, and APIs use no remote service.
+Local API endpoints are `GET /api/progress`, `POST /api/refresh`, `GET /api/health`, `GET /api/map`, and `GET /api/landmarks`. The save watcher checks for stable new and overwritten `.ess` files every 15 seconds by default. The page refreshes data without moving your map view or resetting filters.
 
-The tracker opens game archives, plugins, and saves for reading only. It writes solely to ignored project-local cache and temporary test directories. It never edits the game installation, saves, MO2 profile, or load order. [Map sources and constraints](docs/portable-assets.md) and [implementation status](docs/implementation-plan.md) provide further detail.
+## Compatibility and Limitations
+
+- ESS parsing currently supports the validated combination of **header version 12, form version 78, and LZ4 compression**. Other combinations return an explicit unsupported-format error. Their use by a fresh Steam installation has not yet been verified with an authentic save; support will be expanded only after format and behavior validation.
+- The original regular Deadmano ESP and compacted Tweaks ESP both pass structural import checks. The original layout's save mapping has been tested with synthetic ESS data, but real before/after saves from that layout have not yet been tested.
+- End-to-end setup on a separate clean Steam installation remains to be tested. Other Skyshards implementations and arbitrary modded geography are outside the verified scope.
+- The map uses official local terrain archives and landmark records. Third-party terrain, water, and marker overrides are not automatically applied. Narrow streams and some roads may be less detailed than the game world.
+- The player marker appears only when the save verifies a current outdoor Tamriel location. Interior cells, other worldspaces, and uncertain location data hide it.
+
+## Troubleshooting
+
+- **Map missing:** confirm the named game archives and `Skyrim.esm` exist under `SKYRIM_GAME_DIR\Data`, then run `build-map`. Use `--force` if a valid cache needs rebuilding.
+- **Plugin missing, changed, or conflicting:** run `import-plugin` with the ESP actually active in your game. Do not use an obsolete copy left in `Data` by a mod manager.
+- **All or some statuses unknown:** save after Skyshards initializes; inspect the warnings in Atlas or `/api/progress`. A missing ledger, mismatched counters, or a full/light plugin mismatch cannot safely be treated as zero collected.
+- **Progress has not updated:** save again after the collection animation finishes, then use the Refresh button or wait for the next poll. Atlas reports the save it is currently showing and warns about newer unreadable saves.
+- **No player marker:** the latest verified save may be indoors, in another worldspace, or lack reliable location evidence.
+
+Atlas opens game archives, plugins, and saves for reading only. It writes generated assets and its imported catalog inside ignored project-local directories. Runtime map tiles, Leaflet files, and API calls are served locally.
+
+## Credits and Licenses
+
+Skyshards is Deadmano's mod; Skyrim and its game assets belong to Bethesda. The application generates map imagery locally from the user's installation and does not redistribute game or mod assets. Original Skyshard Atlas code is [MIT licensed](LICENSE). The bundled Leaflet library retains its [BSD 2-Clause license](src/skyshard_tracker/static/vendor/leaflet/LICENSE).

@@ -137,7 +137,10 @@ def _quest_counter_links(value: bytes | None, globals_: dict[str, StructuredReco
             raise PluginError(f"Skyshards quest data {name} points to another global")
 
 
-def export_catalog(plugin_path: Path, output: Path, patches: tuple[Path, ...] = ()) -> None:
+def export_catalog(plugin_path: Path, output: Path, patches: tuple[Path, ...] = (),
+                   *, source_selection: str = "manual") -> None:
+    if source_selection not in ("manual", "data"):
+        raise ValueError("source_selection must be manual or data")
     data, records = read_structured_plugin(plugin_path)
     header = records[0]
     masters = tuple(text(value) for value in header.all("MAST"))
@@ -262,6 +265,7 @@ def export_catalog(plugin_path: Path, output: Path, patches: tuple[Path, ...] = 
                 "loaded_esl_flag": kind == "light", "plugin_kind": kind,
                 "plugin_masters": masters, "self_index": self_index,
                 "source_path": str(plugin_path.resolve()), "shard_count": 108,
+                "source_selection": source_selection,
                 "absorbed_list_form_id": f"{absorbed.form_id:08X}",
                 "counter_global_form_ids": {name: f"{r.form_id:08X}"
                                             for name, r in globals_.items()},
@@ -280,34 +284,92 @@ def export_catalog(plugin_path: Path, output: Path, patches: tuple[Path, ...] = 
 
 
 def ensure_catalog(game_dir: Path, output: Path) -> None:
+    """Use a verified import, or discover the physical Data plugin.
+
+    A cached manual import is authoritative only while its original source and
+    every selected patch can still be fingerprinted. A changed Data plugin is
+    reimported; an ambiguous or damaged manual selection requires a new import.
+    """
     identity_path = output.with_name("identity-validation.json")
     data_plugin = game_dir / "Data/Skyshards.esp"
+
+    def fingerprint(path: Path) -> str:
+        try:
+            with path.open("rb") as handle:
+                digest = hashlib.sha256()
+                for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                    digest.update(chunk)
+                return digest.hexdigest().upper()
+        except OSError as exc:
+            raise PluginError(f"Cannot verify imported plugin or patch {path}: {exc}; "
+                              "run import-plugin with the effective plugin") from exc
+    if output.exists() != identity_path.exists():
+        raise PluginError("Skyshard catalog cache is incomplete; run import-plugin with the effective "
+                          "Skyshards.esp, or remove the incomplete cache to use game Data discovery")
     if output.is_file() and identity_path.is_file():
         try:
             identity = json.loads(identity_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError, TypeError):
-            identity = {}
-        if isinstance(identity, dict):
-            source = Path(identity.get("source_path", ""))
-            if identity.get("validation_kind") == VALIDATOR_VERSION:
-                from .catalog import CatalogError, load_catalog
-                try:
-                    load_catalog(output)
-                except CatalogError as exc:
-                    raise PluginError(f"Imported catalog is invalid; run import-plugin again: {exc}") from exc
-                for patch in identity.get("location_patches", []):
-                    path = Path(patch.get("source_path", ""))
-                    if path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest().upper() != patch.get("sha256"):
-                        raise PluginError(f"Imported location patch changed: {path}; run import-plugin again")
-                if not source.is_file():
-                    return  # A validated imported cache remains usable after source removal.
-                if hashlib.sha256(source.read_bytes()).hexdigest().upper() == identity.get("loaded_sha256"):
-                    return
-                if source.resolve() == data_plugin.resolve():
-                    export_catalog(data_plugin, output)
-                    return
-                raise PluginError("Imported Skyshards.esp changed; run import-plugin again")
+        except (OSError, ValueError, TypeError) as exc:
+            raise PluginError("Skyshard catalog identity is unreadable; run import-plugin with the "
+                              "effective Skyshards.esp") from exc
+        if not isinstance(identity, dict) or identity.get("validation_kind") != VALIDATOR_VERSION:
+            raise PluginError("Skyshard catalog identity is unsupported; run import-plugin with the "
+                              "effective Skyshards.esp")
+        from .catalog import CatalogError, load_catalog
+        try:
+            load_catalog(output)
+        except CatalogError as exc:
+            raise PluginError(f"Imported catalog is invalid; run import-plugin again: {exc}") from exc
+        source_name = identity.get("source_path")
+        if not isinstance(source_name, str) or not source_name:
+            raise PluginError("Imported catalog has no plugin source; run import-plugin again")
+        source = Path(source_name)
+        if not source.is_absolute():
+            raise PluginError("Imported catalog plugin source is not absolute; run import-plugin again")
+        selection = identity.get("source_selection")
+        if selection is None:  # Catalogs imported before source selection was recorded.
+            if (source.resolve() != data_plugin.resolve() and source.name.lower() == "skyshards.esp"
+                    and source.parent.name.lower() == "data"):
+                raise PluginError("Cached catalog belongs to another game Data folder; "
+                                  "run import-plugin with the effective Skyshards.esp")
+            selection = "data" if source.resolve() == data_plugin.resolve() else "manual"
+        if selection not in ("manual", "data"):
+            raise PluginError("Imported catalog source selection is invalid; run import-plugin again")
+        automatic = selection == "data"
+        patches = identity.get("location_patches")
+        if not isinstance(patches, list):
+            raise PluginError("Imported patch identity is invalid; run import-plugin again")
+        if automatic and source.resolve() != data_plugin.resolve():
+            if patches:
+                raise PluginError("Cached Data catalog has selected location patches; "
+                                  "run import-plugin with the effective plugin and patches")
+            if not data_plugin.is_file():
+                raise PluginError("Configured game Data has no Skyshards.esp; run import-plugin with "
+                                  "the effective plugin")
+            export_catalog(data_plugin, output, source_selection="data")
+            return
+        if not source.is_file():
+            raise PluginError(f"Imported Skyshards.esp source is missing or inaccessible: {source}. "
+                              "Run import-plugin with the effective Skyshards.esp; the cached catalog "
+                              "will not be used, even if another plugin exists in game Data")
+        for patch in patches:
+            if not isinstance(patch, dict) or not isinstance(patch.get("source_path"), str):
+                raise PluginError("Imported patch identity is invalid; run import-plugin again")
+            path = Path(patch["source_path"])
+            if not path.is_absolute():
+                raise PluginError("Imported patch source is not absolute; run import-plugin again")
+            if not path.is_file():
+                raise PluginError(f"Imported location patch is missing or inaccessible: {path}; "
+                                  "run import-plugin again with enabled patches")
+            if fingerprint(path) != patch.get("sha256"):
+                raise PluginError(f"Imported location patch changed: {path}; run import-plugin again")
+        if fingerprint(source) == identity.get("loaded_sha256"):
+            return
+        if automatic and not patches:
+            export_catalog(data_plugin, output, source_selection="data")
+            return
+        raise PluginError("Imported Skyshards.esp changed; run import-plugin with the effective plugin again")
     if not data_plugin.is_file():
         raise PluginError("Skyshards.esp was not found in the configured game Data folder. "
                           "Use 'uv run skyshard-tracker import-plugin <path-to-Skyshards.esp>'.")
-    export_catalog(data_plugin, output)
+    export_catalog(data_plugin, output, source_selection="data")

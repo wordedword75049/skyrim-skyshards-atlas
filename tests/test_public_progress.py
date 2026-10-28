@@ -17,7 +17,8 @@ from fastapi.testclient import TestClient
 
 from skyshard_tracker.api import create_app
 from skyshard_tracker.catalog_import import VALIDATOR_VERSION
-from skyshard_tracker.ess import ParsedSave, SaveFormatError, parse_save, unavailable_player_location
+from skyshard_tracker.ess import (ParsedSave, SaveFormatError, UnsupportedSaveError,
+                                  parse_save, unavailable_player_location)
 from skyshard_tracker.models import Catalog, Coordinates, ShardDefinition, TrackerConfig
 from skyshard_tracker.progress import classify
 
@@ -147,9 +148,44 @@ class PublicClassificationTests(unittest.TestCase):
                 parse_save(path, self.catalog)
             self.assertEqual(path.read_bytes(), before)
 
+    def test_supported_and_unsupported_ess_format_boundaries(self):
+        source = synthetic_ess(self.catalog, ())
+        header_end = 17 + struct.unpack_from("<I", source, 13)[0]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "format.ess"
+
+            def check(payload: bytes, error: type[Exception] | None = None,
+                      message: str | None = None):
+                path.write_bytes(payload)
+                if error is None:
+                    parsed_save = parse_save(path, self.catalog)
+                    self.assertEqual((parsed_save.header_version, parsed_save.form_version), (12, 78))
+                else:
+                    with self.assertRaisesRegex(error, message or ""):
+                        parse_save(path, self.catalog)
+                self.assertEqual(path.read_bytes(), payload)
+
+            check(source)
+            changed = bytearray(source)
+            struct.pack_into("<I", changed, 17, 13)
+            check(bytes(changed), UnsupportedSaveError, "header version 13; expected 12")
+            changed = bytearray(source)
+            struct.pack_into("<H", changed, header_end - 2, 1)
+            check(bytes(changed), UnsupportedSaveError, "compression 1; expected LZ4")
+            packed_start = header_end + 4 + 8
+            unpacked, packed = struct.unpack_from("<II", source, header_end + 4)
+            body = bytearray(lz4.block.decompress(source[packed_start:packed_start + packed],
+                                                   uncompressed_size=unpacked))
+            body[0] = 77
+            compressed = lz4.block.compress(bytes(body), store_size=False)
+            changed = source[:header_end + 4] + struct.pack("<II", len(body), len(compressed)) + compressed
+            check(changed, UnsupportedSaveError, "form version 77; expected 78")
+            for payload in (source[:12], source[:25], source[:header_end - 1]):
+                check(payload, SaveFormatError, "signature|header")
+
     def test_synthetic_ess_decodes_transition_at_two_light_plugin_indices(self):
         before_ids = tuple(shard.id for shard in self.catalog.shards
-                           if shard.id != "DMN_SkyshardFalkreath04")[:22]
+                           if shard.id != "DMN_SkyshardFalkreath04")[:2]
         after_ids = before_ids + ("DMN_SkyshardFalkreath04",)
         with tempfile.TemporaryDirectory() as directory:
             snapshots = []
@@ -164,7 +200,7 @@ class PublicClassificationTests(unittest.TestCase):
                 self.assertEqual(decoded.player_location.status, "available")
                 snapshots.append(classify(decoded, self.catalog, modified_at=self.now))
         self.assertEqual([(row.collected_count, row.uncollected_count) for row in snapshots],
-                         [(22, 86), (23, 85)])
+                         [(2, 106), (3, 105)])
         changed = [after.id for before, after in zip(snapshots[0].shards, snapshots[1].shards)
                    if before.status != after.status]
         self.assertEqual(changed, ["DMN_SkyshardFalkreath04"])

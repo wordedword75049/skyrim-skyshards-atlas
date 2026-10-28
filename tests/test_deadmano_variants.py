@@ -152,6 +152,41 @@ class VariantIntegrationTests(unittest.TestCase):
             self.assertEqual(load_catalog(output).plugin_kind, "light")
             self.assertEqual(source.read_bytes(), COMPACTED.read_bytes())
 
+    def test_automatic_data_discovery_reimports_compacted_to_original(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            game = root / "game"
+            (game / "Data").mkdir(parents=True)
+            source = game / "Data/Skyshards.esp"
+            source.write_bytes(COMPACTED.read_bytes())
+            output = root / "catalog/effective-shards.json"
+            ensure_catalog(game, output)
+            self.assertEqual(load_catalog(output).plugin_kind, "light")
+            source.write_bytes(ORIGINAL.read_bytes())
+            ensure_catalog(game, output)
+            self.assertEqual(load_catalog(output).plugin_kind, "full")
+
+    def test_removed_manual_source_conflicts_with_data_until_explicit_reimport(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            game = root / "game"
+            (game / "Data").mkdir(parents=True)
+            data_source = game / "Data/Skyshards.esp"
+            data_source.write_bytes(ORIGINAL.read_bytes())
+            manual_source = root / "mod-manager/Skyshards.esp"
+            manual_source.parent.mkdir()
+            manual_source.write_bytes(COMPACTED.read_bytes())
+            output = root / "catalog/effective-shards.json"
+            export_catalog(manual_source, output)
+            ensure_catalog(game, output)
+            self.assertEqual(load_catalog(output).plugin_kind, "light")
+            manual_source.unlink()
+            with self.assertRaisesRegex(PluginError, "source is missing"):
+                ensure_catalog(game, output)
+            export_catalog(data_source, output)
+            ensure_catalog(game, output)
+            self.assertEqual(load_catalog(output).plugin_kind, "full")
+
 
 if __name__ == "__main__":
     unittest.main()
