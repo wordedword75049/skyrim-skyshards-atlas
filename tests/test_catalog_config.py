@@ -31,13 +31,13 @@ class ConfigTests(unittest.TestCase):
                                 encoding="utf-8")
             with patch.dict(os.environ, {}, clear=True):
                 config = load_config(env_file)
-                self.assertEqual(config.game_directory, root / "game-a")
-                self.assertEqual(config.save_directory, root / "saves-a")
+                self.assertTrue(config.game_directory.samefile(root / "game-a"))
+                self.assertTrue(config.save_directory.samefile(root / "saves-a"))
             with patch.dict(os.environ, {"SKYRIM_GAME_DIR": str(root / "game-b"),
                                       "SKYRIM_SAVES_DIR": str(root / "saves-b")}, clear=True):
                 config = load_config(env_file)
-                self.assertEqual(config.game_directory, root / "game-b")
-                self.assertEqual(config.save_directory, root / "saves-b")
+                self.assertTrue(config.game_directory.samefile(root / "game-b"))
+                self.assertTrue(config.save_directory.samefile(root / "saves-b"))
                 self.assertEqual(config.host, "127.0.0.1")
 
     def test_missing_and_invalid_paths_are_actionable(self):
