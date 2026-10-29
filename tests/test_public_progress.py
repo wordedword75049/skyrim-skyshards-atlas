@@ -21,6 +21,7 @@ from skyshard_tracker.ess import (ParsedSave, SaveFormatError, UnsupportedSaveEr
                                   parse_save, unavailable_player_location)
 from skyshard_tracker.models import Catalog, Coordinates, ShardDefinition, TrackerConfig
 from skyshard_tracker.progress import classify
+from skyshard_tracker.watcher import SaveWatcher
 
 
 COUNTERS = ("DMN_SkyshardsCountActivated", "DMN_SkyshardsSkyrimCountActivated",
@@ -56,7 +57,8 @@ def parsed(members: tuple[int, ...] | None, *, count: int | None = None,
 
 def synthetic_ess(catalog: Catalog, member_ids: tuple[str, ...], *, light_index: int = 0,
                   full_index: int = 7, cell_id: int = 0x3C,
-                  location: str = "Skyrim") -> bytes:
+                  location: str = "Skyrim", master_name: str = "Skyrim.esm",
+                  player_payload: bytes | None = None) -> bytes:
     """Construct a tiny legal ESS v12/LZ4 byte stream without game-derived content."""
     def wstring(value: str) -> bytes:
         encoded = value.encode("utf-8")
@@ -69,12 +71,12 @@ def synthetic_ess(catalog: Catalog, member_ids: tuple[str, ...], *, light_index:
               header_fields + bytes(4))
     header_size = len(header)
     if catalog.plugin_kind == "light":
-        plugin_info = (b"\x01" + wstring("Skyrim.esm") + struct.pack("<H", light_index + 1) +
+        plugin_info = (b"\x01" + wstring(master_name) + struct.pack("<H", light_index + 1) +
                        b"".join(wstring(f"Other{index}.esl") for index in range(light_index)) +
                        wstring("Skyshards.esp"))
         prefix = 0xFE000000 | light_index << 12
     else:
-        plugin_info = (bytes([full_index + 1]) + wstring("Skyrim.esm") +
+        plugin_info = (bytes([full_index + 1]) + wstring(master_name) +
                        b"".join(wstring(f"Other{index}.esp") for index in range(1, full_index)) +
                        wstring("Skyshards.esp") + struct.pack("<H", 0))
         prefix = full_index << 24
@@ -96,7 +98,8 @@ def synthetic_ess(catalog: Catalog, member_ids: tuple[str, ...], *, light_index:
     list_change = (ref(prefix | catalog.absorbed_list_local_id) +
                    struct.pack("<IBB", 0x80000000, 43, 78) +
                    bytes([len(list_payload), 0]) + list_payload)
-    player_payload = direct(cell_id) + struct.pack("<6f", 100, 200, 300, 0, 0, 1)
+    if player_payload is None:
+        player_payload = direct(cell_id) + struct.pack("<6f", 100, 200, 300, 0, 0, 1)
     player_change = (direct(0x14) + struct.pack("<IBB", 2, 1, 78) +
                      bytes([len(player_payload), 0]) + player_payload)
     changes = list_change + player_change
@@ -213,6 +216,43 @@ class PublicClassificationTests(unittest.TestCase):
             self.assertEqual(decoded.player_location.status, "unavailable")
             self.assertEqual(decoded.player_location.current_cell_form_id, "00000222")
 
+    def test_tamriel_player_position_ignores_localized_header_label(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "localized.ess"
+            for label in ("Skyrim", "Скайрим", "Geographic label in another language"):
+                with self.subTest(label=label):
+                    path.write_bytes(synthetic_ess(self.catalog, (), location=label))
+                    position = parse_save(path, self.catalog).player_location
+                    self.assertEqual(position.status, "available")
+                    self.assertEqual(position.saved_location, label)
+                    self.assertEqual(position.current_cell_form_id, "0000003C")
+                    self.assertEqual((position.worldspace, position.is_exterior), ("Tamriel", True))
+                    self.assertEqual((position.x, position.y, position.z, position.rotation),
+                                     (100.0, 200.0, 300.0, 1.0))
+                    self.assertFalse(any("header" in evidence.lower() for evidence in position.evidence))
+
+    def test_player_position_rejects_other_cells_and_invalid_structural_evidence(self):
+        valid_position = (1 << 22 | 0x3C).to_bytes(3, "big") + struct.pack("<6f", 100, 200, 300, 0, 0, 1)
+        cases = (
+            (dict(cell_id=0x222, location="Skyrim"), "not Tamriel"),
+            (dict(cell_id=0x3D, location="Skyrim"), "not Tamriel"),
+            (dict(master_name="Other.esm"), "Skyrim.esm is not the first full plugin"),
+            (dict(player_payload=valid_position[:8]), "truncated"),
+            (dict(player_payload=b"\x00\x00\x00" + valid_position[3:]), "cannot be resolved"),
+            (dict(player_payload=valid_position[:3] + struct.pack("<6f", float("nan"), 200, 300, 0, 0, 1)),
+             "non-finite"),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "invalid-location.ess"
+            for options, reason in cases:
+                with self.subTest(options=options):
+                    path.write_bytes(synthetic_ess(self.catalog, (), **options))
+                    position = parse_save(path, self.catalog).player_location
+                    self.assertEqual(position.status, "unavailable")
+                    self.assertIn(reason, position.reason)
+                    self.assertIsNone(position.x)
+                    self.assertIsNone(position.worldspace)
+
     def test_synthetic_full_esp_remaps_at_two_full_indices(self):
         catalog = synthetic_catalog("full")
         with tempfile.TemporaryDirectory() as directory:
@@ -234,6 +274,23 @@ class PublicClassificationTests(unittest.TestCase):
             snapshot = classify(parse_save(path, full_catalog), full_catalog, modified_at=self.now)
             self.assertEqual(snapshot.unknown_count, 108)
             self.assertTrue(any("but the imported plugin is full" in w for w in snapshot.warnings))
+
+    def test_missing_optional_skse_cosave_does_not_warn_or_degrade_progress(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "Quicksave.ess"
+            path.write_bytes(synthetic_ess(self.catalog, (self.catalog.shards[0].id,)))
+            watcher = SaveWatcher(Path(directory), self.catalog, stability_delay=0)
+            snapshot = watcher.refresh()
+            self.assertEqual((snapshot.collected_count, snapshot.uncollected_count,
+                              snapshot.unknown_count), (1, 107, 0))
+            self.assertEqual(snapshot.save.co_save_status, "missing")
+            self.assertTrue(snapshot.is_newest)
+            self.assertFalse(any("SKSE" in warning for warning in snapshot.warnings))
+            with patch.object(watcher, "_co_save_status", return_value="unreadable"):
+                unreadable = watcher.refresh(force=True)
+            self.assertEqual((unreadable.collected_count, unreadable.uncollected_count,
+                              unreadable.unknown_count), (1, 107, 0))
+            self.assertIn("Matching SKSE co-save: unreadable", unreadable.warnings)
 
 
 class PublicApiTests(unittest.TestCase):

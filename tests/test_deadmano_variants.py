@@ -22,6 +22,7 @@ from tests.test_public_progress import synthetic_ess
 ROOT = Path(__file__).resolve().parents[1]
 ORIGINAL = ROOT / "research/inputs/Skyshards.esp"
 COMPACTED = ROOT / "research/inputs/Skyshards-loaded.esp"
+RUSSIAN_SAVES = ROOT / "research/inputs/xtraSaves"
 PATCHES = tuple(ROOT / "research/inputs" / name for name in (
     "Skyshards - Ryn's Bleakwind Basin Patch.esp",
     "Skyshards - Ryn's Karthspire Patch.esp",
@@ -77,6 +78,24 @@ class VariantIntegrationTests(unittest.TestCase):
                                      modified_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
                 self.assertEqual((uncertain.collected_count, uncertain.uncollected_count,
                                   uncertain.unknown_count), (22, 0, 86))
+
+    @unittest.skipUnless(all((RUSSIAN_SAVES / state).is_dir() for state in ("before", "after")),
+                         "Private Russian-language original-ESP saves are unavailable")
+    def test_real_russian_original_esp_save_exposes_tamriel_position(self):
+        with tempfile.TemporaryDirectory() as directory:
+            catalog = self._import(ORIGINAL, Path(directory))
+            for state, counts in (("before", (0, 0, 108)), ("after", (1, 107, 0))):
+                with self.subTest(state=state):
+                    saves = list((RUSSIAN_SAVES / state).glob("*.ess"))
+                    self.assertEqual(len(saves), 1)
+                    parsed = parse_save(saves[0], catalog)
+                    result = classify(parsed, catalog)
+                    self.assertEqual((result.collected_count, result.uncollected_count,
+                                      result.unknown_count), counts)
+                    self.assertEqual(parsed.player_location.status, "available")
+                    self.assertEqual(parsed.player_location.saved_location, "Скайрим")
+                    self.assertEqual(parsed.player_location.current_cell_form_id, "0000003C")
+                    self.assertEqual(parsed.player_location.worldspace, "Tamriel")
 
     @unittest.skipUnless(all(path.is_file() for path in PATCHES),
                          "Private validated location patches are unavailable")

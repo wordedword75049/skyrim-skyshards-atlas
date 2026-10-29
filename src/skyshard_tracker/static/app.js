@@ -119,7 +119,7 @@ function playerPopup(location, save) {
   title.textContent = `${save.character || 'Player'} · Saved position`;
   const place = document.createElement('div');
   place.className = 'popup-meta';
-  place.textContent = `${location.saved_location || 'Tamriel'} · ${Math.round(location.x).toLocaleString()}, ${Math.round(location.y).toLocaleString()}, ${Math.round(location.z).toLocaleString()} (X, Y, Z)`;
+  place.textContent = `${location.worldspace} · ${Math.round(location.x).toLocaleString()}, ${Math.round(location.y).toLocaleString()}, ${Math.round(location.z).toLocaleString()} (X, Y, Z)`;
   const source = document.createElement('div');
   source.className = 'popup-evidence';
   source.textContent = `${save.filename} · ${localTime(save.modified_at)}`;
@@ -182,9 +182,9 @@ function showSaveState(data) {
   el('save-file').textContent = save?.filename ?? 'No save loaded';
   const location = data.player_location;
   el('player-location-state').textContent = visiblePlayerLocation(data) ?
-    `Player position: ${location.saved_location || 'Tamriel'} · X ${Math.round(location.x).toLocaleString()}, Y ${Math.round(location.y).toLocaleString()}` :
+    `Player position: ${location.worldspace} · X ${Math.round(location.x).toLocaleString()}, Y ${Math.round(location.y).toLocaleString()}` :
     `Player position unavailable: ${data.newer_save_error ? 'newer save could not be read' :
-      location?.reason || 'no verified outdoor Tamriel position'}${location?.saved_location ? ` (${location.saved_location})` : ''}`;
+      location?.reason || 'no verified outdoor Tamriel position'}`;
   const warnings = [];
   if (data.newer_save_error) warnings.push(`Newer save problem: ${data.newer_save_error}`);
   if (save && !data.is_newest && !data.newer_save_error) warnings.push('Displayed progress is not from the newest save.');

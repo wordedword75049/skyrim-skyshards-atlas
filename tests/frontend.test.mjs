@@ -76,9 +76,9 @@ test('player position is visible only for a current verified Tamriel exterior sa
   assert.deepEqual(pixels, [4098, 4100]);
 });
 
-test('missing optional co-save is diagnostic, not stale progress', () => {
-  const current = snapshot([], save(1, '2026-01-01T12:00:00Z'),
-    {warnings: ['Matching SKSE co-save: missing']});
+test('missing optional co-save leaves the current save live without a warning', () => {
+  const current = snapshot([], {...save(1, '2026-01-01T12:00:00Z'), co_save_status: 'missing'},
+    {warnings: []});
   assert.deepEqual(saveIndicator(current), {state: 'live', text: 'LATEST SAVE'});
   assert.equal(saveIndicator({...current, newer_save_error: 'bad save'}).state, 'stale');
   assert.equal(saveIndicator({...current, unknown_count: 108}).state, 'stale');

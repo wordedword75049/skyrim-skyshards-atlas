@@ -82,11 +82,10 @@ Local API endpoints are `GET /api/progress`, `POST /api/refresh`, `GET /api/heal
 
 ## Compatibility and Limitations
 
-- ESS parsing currently supports the validated combination of **header version 12, form version 78, and LZ4 compression**. Other combinations return an explicit unsupported-format error. Their use by a fresh Steam installation has not yet been verified with an authentic save; support will be expanded only after format and behavior validation.
-- The original regular Deadmano ESP and compacted Tweaks ESP both pass structural import checks. The original layout's save mapping has been tested with synthetic ESS data, but real before/after saves from that layout have not yet been tested.
-- End-to-end setup on a separate clean Steam installation remains to be tested. Other Skyshards implementations and arbitrary modded geography are outside the verified scope.
+- ESS parsing supports the verified combination of **header version 12, form version 78, and LZ4 compression**. Other combinations return an explicit unsupported-format error.
+- The original regular Deadmano ESP has been tested on a clean Steam Skyrim SE installation with a real post-absorption save; the compacted Tweaks ESP has also been validated with real saves. Other Skyshards implementations and arbitrary modded geography are outside the verified scope.
 - The map uses official local terrain archives and landmark records. Third-party terrain, water, and marker overrides are not automatically applied. Narrow streams and some roads may be less detailed than the game world.
-- The player marker appears only when the save verifies a current outdoor Tamriel location. Interior cells, other worldspaces, and uncertain location data hide it.
+- The player marker appears only when the save verifies a current outdoor Tamriel location using the player reference and Skyrim master identity. Interior cells, other worldspaces, and uncertain location data hide it. Localized save-header location names are retained as metadata but do not determine the map position.
 
 ## Troubleshooting
 

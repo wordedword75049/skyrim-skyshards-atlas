@@ -193,15 +193,14 @@ def _decode_player_location(payload: bytes | memoryview, flags: int, form_type: 
         return unavailable_player_location("Player current cell/worldspace is not Tamriel; it may be an interior or another worldspace",
                                            header_location, cell_hex)
     if not skyrim_master_valid:
-        return unavailable_player_location("Skyrim.esm identity could not be verified", header_location, cell_hex)
-    if header_location != "Skyrim":
-        return unavailable_player_location("Save header location disagrees with Tamriel player reference",
+        return unavailable_player_location("Skyrim.esm is not the first full plugin in the save; Tamriel FormID cannot be verified",
                                            header_location, cell_hex)
     return PlayerLocation(status="available", reason=None, saved_location=header_location,
                           current_cell_form_id=cell_hex, worldspace="Tamriel", is_exterior=True,
                           x=values[0], y=values[1], z=values[2], rotation=values[5],
-                          evidence=("Player ACHR current cell/WRLD RefID 0000003C",
-                                    "Player ACHR initial position and rotation", "save header location Skyrim"))
+                          evidence=("Skyrim.esm is the first full plugin in the save",
+                                    "Player ACHR current cell/WRLD RefID 0000003C (Tamriel)",
+                                    "Player ACHR finite position and rotation"))
 
 
 def _body(data: bytes, pos: int) -> bytes:

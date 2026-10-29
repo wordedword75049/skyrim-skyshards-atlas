@@ -121,7 +121,7 @@ class SaveWatcher:
                     return self._show_error(candidate, "Newest ESS changed before publication; result discarded")
                 modified = datetime.fromtimestamp(candidate.mtime_ns / 1_000_000_000, timezone.utc)
                 snapshot = classify(parsed, self.catalog, modified_at=modified, co_save_status=co_save_status)
-                if co_save_status != "stable":
+                if co_save_status in ("pending", "unreadable"):
                     snapshot = snapshot.model_copy(update={
                         "warnings": snapshot.warnings + (f"Matching SKSE co-save: {co_save_status}",)})
                 self._snapshot = snapshot
