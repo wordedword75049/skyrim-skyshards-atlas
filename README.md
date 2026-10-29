@@ -1,5 +1,8 @@
 # Skyshard Atlas
 
+<img width="958" height="453" alt="image" src="https://github.com/user-attachments/assets/5be3cb9f-1ff7-454d-ac9c-259cf37d94da" />
+
+
 Skyshard Atlas is a local, read-only map and save tracker for the 108 collectibles in Deadmano's Skyshards mod for Skyrim Special Edition. It shows collected, uncollected, and unknown shards on a terrain map built from your installed game assets. It can also show your last saved outdoor position in Skyrim.
 
 The application runs on your PC at <http://127.0.0.1:8000/>. It does not connect to Skyrim's live memory or require an internet connection during use.
