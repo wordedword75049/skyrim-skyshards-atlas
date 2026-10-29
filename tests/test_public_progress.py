@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+from importlib.metadata import version as package_version
 import struct
 import tempfile
 import unittest
@@ -318,6 +319,8 @@ class PublicApiTests(unittest.TestCase):
                                    map_cache_directory=root / "map")
             with patch("skyshard_tracker.mapgen.build_map", side_effect=AssertionError("unexpected build")):
                 with TestClient(create_app(config, stability_delay=0.01)) as client:
+                    self.assertEqual(client.get("/openapi.json").json()["info"]["version"],
+                                     package_version("skyshard-atlas"))
                     self.assertEqual(client.get("/api/map").json()["state"], "error")
                     self.assertEqual(client.get("/api/progress").json()["unknown_count"], 108)
                     self.assertFalse(client.get("/api/health").json()["map_available"])

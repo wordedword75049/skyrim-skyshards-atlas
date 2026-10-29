@@ -7,6 +7,7 @@ import json
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
+from importlib.metadata import version as package_version
 from pathlib import Path
 from typing import Literal
 
@@ -85,7 +86,7 @@ def create_app(config: TrackerConfig, *, stability_delay: float = 1.0,
             watcher.running = False
             LOG.info("Save watcher stopped")
 
-    app = FastAPI(title="Skyshard Atlas", version="0.2.0", lifespan=lifespan)
+    app = FastAPI(title="Skyshard Atlas", version=package_version("skyshard-atlas"), lifespan=lifespan)
     app.state.watcher = watcher
     app.state.enhanced_assets = enhanced_assets
     static_root = Path(__file__).with_name("static")
